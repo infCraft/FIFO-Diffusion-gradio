@@ -32,7 +32,7 @@ def on_generate_click(mode, prompt, seed, video_length):
 if __name__ == "__main__":
     with gr.Blocks(title="FIFO-Diffusion") as demo:
         gr.HTML("""
-            <h1 style='text-align: center;'>FIFO-Diffusion Model Demo</h1>
+            <h1 style='text-align: center;'>FIFO-Diffusion Model Demo - by 黄祯 2022302121425</h1>
             <h2 style='text-align: center; color: magenta;'>使用说明</h2>
             <p style='text-align: center;'>1. 选择你所需要的模型</p>
             <p style='text-align: center;'>2. 根据格式输入prompt</p>

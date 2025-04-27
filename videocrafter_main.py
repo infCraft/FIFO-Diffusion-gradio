@@ -105,10 +105,20 @@ def main(args):
                                                           latents_dir=latents_dir)
         save_gif(base_tensor, output_dir, "origin")
 
+    # 根据参数选择使用哪个采样函数
+    # if args.use_memory:
+    #     # 使用记忆增强版采样
+    #     from scripts.evaluation.funcs import memory_enhanced_fifo_ddim_sampling
+    #     video_frames = memory_enhanced_fifo_ddim_sampling(
+    #         args, model, cond, noise_shape, ddim_sampler, args.unconditional_guidance_scale, 
+    #         output_dir=output_dir, latents_dir=latents_dir, save_frames=args.save_frames
+    #     )
+    # 使用原始采样
     video_frames = fifo_ddim_sampling(
-        args, model, cond, noise_shape, ddim_sampler, args.unconditional_guidance_scale, output_dir=output_dir,
-        latents_dir=latents_dir, save_frames=args.save_frames
+        args, model, cond, noise_shape, ddim_sampler, args.unconditional_guidance_scale, 
+        output_dir=output_dir, latents_dir=latents_dir, save_frames=args.save_frames
     )
+
     output_path = output_dir + "/video"
 
     imageio.mimsave(output_path + ".mp4", video_frames[-args.new_video_length:], fps=args.output_fps)
@@ -156,6 +166,7 @@ def craft(prompt, seed, video_length):
     parser.add_argument("--eta", "-e", type=float, default=1.0)
     parser.add_argument("--output_dir", type=str, default=None, help="custom output directory")
     # parser.add_argument("--use_mp4", action="store_true", default=False, help="use mp4 format for the output video")
+
 
     args = parser.parse_args()
 
@@ -226,6 +237,11 @@ def craft2(seed, multiprompts, prompts_length):
     parser.add_argument("--eta", "-e", type=float, default=1.0)
     parser.add_argument("--output_dir", type=str, default=None, help="custom output directory")
 
+    
+    # 添加记忆增强选项
+    parser.add_argument("--use_memory", action="store_true", default=True,
+                      help="使用记忆增强机制保持视频一致性")
+
     args = parser.parse_args()
 
     args.num_inference_steps = args.video_length * args.num_partitions
@@ -290,11 +306,19 @@ def main_multiprompts(args, multiprompts):
                                                           latents_dir=latents_dir)
         save_gif(base_tensor, output_dir, "origin")
 
+    if args.use_memory:
+        # 使用记忆增强版采样
+        from scripts.evaluation.funcs import memory_enhanced_fifo_ddim_sampling_multiprompts
+        video_frames = memory_enhanced_fifo_ddim_sampling_multiprompts(
+            args, model, cond, noise_shape, ddim_sampler, multiprompts, args.unconditional_guidance_scale, 
+            output_dir=output_dir, latents_dir=latents_dir, save_frames=args.save_frames
+        )
+    else:
     # 使用多提示版本的FIFO采样
-    video_frames = fifo_ddim_sampling_multiprompts(
-        args, model, cond, noise_shape, ddim_sampler, multiprompts, args.unconditional_guidance_scale, 
-        output_dir=output_dir, latents_dir=latents_dir, save_frames=args.save_frames
-    )
+        video_frames = fifo_ddim_sampling_multiprompts(
+            args, model, cond, noise_shape, ddim_sampler, multiprompts, args.unconditional_guidance_scale, 
+            output_dir=output_dir, latents_dir=latents_dir, save_frames=args.save_frames
+        )
     output_path = output_dir + "/video"
 
     imageio.mimsave(output_path + ".mp4", video_frames[-args.new_video_length:], fps=args.output_fps)

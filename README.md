@@ -1,10 +1,13 @@
 # FIFO-Diffusion: Generating Infinite Videos from Text without Training (NeurIPS 2024)
 
+## News📢
+- v1.0.1 引入MemoryBank记忆机制，结合高斯低通滤波器实现增强模型全局注意力
+
 ## Cuda部署FIFO-Diffusion on VideoCrafter2 & Open-Sora v1.1.0
 
-### 1. 克隆仓库
+### 1. 克隆本仓库
 ```sh
-git clone https://github.com/jjihwan/FIFO-Diffusion_public.git
+git clone https://github.com/infCraft/FIFO-Diffusion-gradio.git
 cd FIFO-Diffusion_public
 ```
 

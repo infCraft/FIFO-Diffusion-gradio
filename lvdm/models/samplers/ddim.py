@@ -184,20 +184,70 @@ class DDIMSampler(object):
 
     @torch.no_grad()
     def fifo_onestep(self, cond, shape, latents=None, timesteps=None, indices=None,
-                     unconditional_guidance_scale=1., unconditional_conditioning=None,
-                     **kwargs):
-        device = self.model.betas.device        
+                unconditional_guidance_scale=1., unconditional_conditioning=None,
+                memory_context=None, **kwargs):
+        # device = self.model.betas.device        
+        # b, _, f, _, _ = shape
+
+        # ts = torch.Tensor(timesteps.copy()).to(device=device, dtype=torch.long) # [16]
+        # noise_pred = self.unet(latents, cond, ts,
+        #                         unconditional_guidance_scale=unconditional_guidance_scale,
+        #                         unconditional_conditioning=unconditional_conditioning,
+        #                         **kwargs)
+        
+        # latents, pred_x0 = self.ddim_step(latents, noise_pred, indices)
+
+        # return latents, pred_x0
+
+        """
+        Modified fifo_onestep to incorporate memory context for improved temporal consistency
+        """
         b, _, f, _, _ = shape
+        device = self.model.betas.device
+        
+        if latents is None:
+            img = torch.randn(shape, device=self.model.device)
+        else:
+            img = latents
 
         ts = torch.Tensor(timesteps.copy()).to(device=device, dtype=torch.long) # [16]
-        noise_pred = self.unet(latents, cond, ts,
-                                unconditional_guidance_scale=unconditional_guidance_scale,
-                                unconditional_conditioning=unconditional_conditioning,
-                                **kwargs)
         
-        latents, pred_x0 = self.ddim_step(latents, noise_pred, indices)
-
-        return latents, pred_x0
+        # 获取当前的噪声预测
+        noise_pred = self.unet(img, cond, ts, unconditional_guidance_scale, unconditional_conditioning, **kwargs)
+        
+        # 如果提供了记忆上下文，使用它来增强噪声预测
+        if memory_context is not None:
+            # 记忆上下文影响噪声预测的强度
+            memory_weight = 0.1
+            
+            # 将记忆上下文调整为与噪声预测相同的形状
+            # 假设memory_context的形状为 [batch_size, feature_dim]
+            _, c, f, h, w = noise_pred.shape
+            
+            # 只有当记忆已初始化时才应用
+            if torch.sum(torch.abs(memory_context)) > 1e-6:
+                # 将记忆特征投影到噪声空间
+                # 这需要额外的层，简单实现可以使用线性投影
+                if not hasattr(self, 'memory_projector'):
+                    # 创建投影层，将记忆特征投影到噪声空间
+                    feature_dim = memory_context.shape[1]
+                    self.memory_projector = torch.nn.Linear(feature_dim, c).to(self.model.device)
+                    # 初始化为小权重，以便轻微影响
+                    torch.nn.init.normal_(self.memory_projector.weight, mean=0.0, std=0.01)
+                    
+                # 投影记忆特征
+                memory_noise = self.memory_projector(memory_context)
+                
+                # 调整形状以匹配噪声预测
+                memory_noise = memory_noise.view(b, c, 1, 1, 1).expand(b, c, f, h, w)
+                
+                # 融合噪声预测和记忆特征
+                noise_pred = (1 - memory_weight) * noise_pred + memory_weight * memory_noise
+        
+        # 应用DDIM步骤
+        output, pred_x0 = self.ddim_step(img, noise_pred, indices)
+        
+        return output, pred_x0
 
     @torch.no_grad()
     def p_sample_ddim(self, x, c, t, index, repeat_noise=False, use_original_steps=False, quantize_denoised=False,
